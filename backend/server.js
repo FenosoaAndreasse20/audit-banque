@@ -4,6 +4,7 @@ const cors = require("cors")
 const retraitRoutes = require("./routes/retraitRoutes")
 const auditRoutes = require("./routes/auditRoutes")
 const statsRoutes = require("./routes/statsRoutes")
+const clientRoutes = require("./routes/clientRoutes");
 
 const app = express()
 
@@ -13,6 +14,7 @@ app.use(express.json())
 app.use("/retraits",retraitRoutes)
 app.use("/audit",auditRoutes)
 app.use("/stats",statsRoutes)
+app.use("/clients", clientRoutes);
 
 app.listen(5000,()=>{
 console.log("Serveur démarré sur port 5000")

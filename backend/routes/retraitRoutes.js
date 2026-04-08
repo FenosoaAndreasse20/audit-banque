@@ -2,13 +2,24 @@ const express = require("express")
 const router = express.Router()
 const db = require("../db")
 
-// afficher retraits
-router.get("/",(req,res)=>{
-db.query("SELECT * FROM retrait",(err,result)=>{
-if(err) res.send(err)
-else res.json(result)
-})
-})
+router.get("/", (req, res) => {
+  const sql = `
+    SELECT 
+      r.num_retrait,
+      r.num_compte,
+      c.nomclient,
+      c.solde,
+      r.montant,
+      (c.solde - r.montant) AS solde_apres
+    FROM retrait r
+    JOIN client c ON r.num_compte = c.num_compte
+  `;
+
+  db.query(sql, (err, result) => {
+    if (err) return res.send(err);
+    res.json(result);
+  });
+});
 
 // ajouter retrait
 router.post("/", (req, res) => {
@@ -57,18 +68,56 @@ data:result
 })
 
 // modifier retrait
-router.put("/:id",(req,res)=>{
-const {montant} = req.body
+router.put("/:id", (req, res) => {
+  const { montant } = req.body;
 
-db.query(
-"UPDATE retrait SET montant=? WHERE num_retrait=?",
-[montant,req.params.id],
-(err,result)=>{
-if(err) res.send(err)
-else res.json(result)
-}
-)
-})
+  // récupérer le retrait actuel
+  db.query(
+    "SELECT num_compte, montant FROM retrait WHERE num_retrait=?",
+    [req.params.id],
+    (err, result) => {
+      if (err) return res.send(err);
+
+      if (result.length === 0) {
+        return res.status(404).json({ message: "Retrait introuvable" });
+      }
+
+      const num_compte = result[0].num_compte;
+      const ancienMontant = parseFloat(result[0].montant);
+      const nouveauMontant = parseFloat(montant);
+
+      // récupérer le solde actuel
+      db.query(
+        "SELECT solde FROM client WHERE num_compte=?",
+        [num_compte],
+        (err, clientResult) => {
+          if (err) return res.send(err);
+
+          const solde = parseFloat(clientResult[0].solde);
+
+          // 🔥 vérification correcte
+          const soldeDisponible = solde + ancienMontant;
+
+          if (nouveauMontant > soldeDisponible) {
+            return res.status(400).json({
+              message: "Solde insuffisant pour modifier ce retrait"
+            });
+          }
+
+          // update si OK
+          db.query(
+            "UPDATE retrait SET montant=? WHERE num_retrait=?",
+            [nouveauMontant, req.params.id],
+            (err, result) => {
+              if (err) return res.send(err);
+              res.json({ message: "Modification réussie" });
+            }
+          );
+        }
+      );
+    }
+  );
+});
 
 // supprimer retrait
 router.delete("/:id",(req,res)=>{
