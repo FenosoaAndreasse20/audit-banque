@@ -8,11 +8,16 @@ router.get("/", (req, res) => {
       r.num_retrait,
       r.num_compte,
       c.nomclient,
-      c.solde,
+      c.solde AS solde_initial,
       r.montant,
-      (c.solde - r.montant) AS solde_apres
+      (
+        SELECT c.solde - IFNULL(SUM(r2.montant),0)
+        FROM retrait r2
+        WHERE r2.num_compte = r.num_compte AND r2.num_retrait <= r.num_retrait
+      ) AS solde_apres
     FROM retrait r
     JOIN client c ON r.num_compte = c.num_compte
+    ORDER BY r.num_compte, r.num_retrait
   `;
 
   db.query(sql, (err, result) => {
